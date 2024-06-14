@@ -14,8 +14,9 @@ import (
 )
 
 type Repo struct {
-	Name    string `json:"name"`
-	HTMLUrl string `json:"html_url"`
+	Name        string `json:"name"`
+	HTMLUrl     string `json:"html_url"`
+	Description string `json:"description"`
 }
 
 func getRepos(username, token string) ([]Repo, error) {
@@ -57,18 +58,36 @@ func runGitCommand(args ...string) error {
 	return cmd.Run()
 }
 
+func writeDescription(repoPath, description string) error {
+	descriptionPath := filepath.Join(repoPath, "description")
+	return os.WriteFile(descriptionPath, []byte(description), 0644)
+}
+
 func syncRepo(repo Repo, targetDir string) error {
-	repoPath := filepath.Join(targetDir, repo.Name)
+	repoPath := filepath.Join(targetDir, repo.Name+".git")
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		fmt.Printf("Cloning repository %s...\n", repo.Name)
-		return runGitCommand("clone", repo.HTMLUrl, repoPath)
+		fmt.Printf("Cloning repository %s as bare...\n", repo.Name)
+		if err := runGitCommand("clone", "--bare", repo.HTMLUrl, repoPath); err != nil {
+			return err
+		}
 	} else {
 		fmt.Printf("Pulling updates for repository %s...\n", repo.Name)
 		cmd := exec.Command("git", "-C", repoPath, "pull")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		return cmd.Run()
+		if err := cmd.Run(); err != nil {
+			return err
+		}
 	}
+
+	// Write the repository description
+	if repo.Description != "" {
+		if err := writeDescription(repoPath, repo.Description); err != nil {
+			return fmt.Errorf("failed to write description for %s: %v", repo.Name, err)
+		}
+	}
+
+	return nil
 }
 
 func main() {
