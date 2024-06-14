@@ -20,35 +20,47 @@ type Repo struct {
 }
 
 func getRepos(username, token string) ([]Repo, error) {
-	url := fmt.Sprintf("https://api.github.com/users/%s/repos", username)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.SetBasicAuth(username, token)
+	var allRepos []Repo
+	page := 1
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	for {
+		url := fmt.Sprintf("https://api.github.com/users/%s/repos?page=%d&per_page=100", username, page)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.SetBasicAuth(username, token)
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch repositories: %s", resp.Status)
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("failed to fetch repositories: %s", resp.Status)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var repos []Repo
+		if err := json.Unmarshal(body, &repos); err != nil {
+			return nil, err
+		}
+
+		if len(repos) == 0 {
+			break
+		}
+
+		allRepos = append(allRepos, repos...)
+		page++
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var repos []Repo
-	if err := json.Unmarshal(body, &repos); err != nil {
-		return nil, err
-	}
-
-	return repos, nil
+	return allRepos, nil
 }
 
 func runGitCommand(args ...string) error {
