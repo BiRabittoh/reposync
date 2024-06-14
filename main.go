@@ -71,8 +71,8 @@ func syncRepo(repo Repo, targetDir string) error {
 			return err
 		}
 	} else {
-		fmt.Printf("Pulling updates for repository %s...\n", repo.Name)
-		cmd := exec.Command("git", "-C", repoPath, "pull")
+		fmt.Printf("Fetching updates for bare repository %s...\n", repo.Name)
+		cmd := exec.Command("git", "--git-dir", repoPath, "fetch", "--all")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -81,10 +81,8 @@ func syncRepo(repo Repo, targetDir string) error {
 	}
 
 	// Write the repository description
-	if repo.Description != "" {
-		if err := writeDescription(repoPath, repo.Description); err != nil {
-			return fmt.Errorf("failed to write description for %s: %v", repo.Name, err)
-		}
+	if err := writeDescription(repoPath, repo.Description); err != nil {
+		return fmt.Errorf("failed to write description for %s: %v", repo.Name, err)
 	}
 
 	return nil
